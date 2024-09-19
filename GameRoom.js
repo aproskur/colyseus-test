@@ -1,94 +1,100 @@
-const { Room } = require('colyseus');
-const { Schema, MapSchema, defineTypes } = require('@colyseus/schema');
+const colyseus = require('colyseus');
+const schema = require('@colyseus/schema');
 
-
-
-// Define Player schema
-class Player extends Schema {
+// An abstract player object, demonstrating a potential 2D world position
+exports.Player = class Player extends schema.Schema {
     constructor() {
         super();
         this.x = 750;
         this.y = 450;
         this.position = 0;
+        this.spriteType = "default";
+        console.log(`New Player created with initial position: ${this.position}`); // DEBUG
     }
 }
 
-defineTypes(Player, {
+
+// schema to define the structure for each player, specifying fields 
+//This schema tells Colyseus how to synchronize the state of individual players across clients.
+schema.defineTypes(exports.Player, {
     x: "number",
     y: "number",
-    position: "number"
+    position: "number",
+    spriteType: "string"
 });
 
-class State extends Schema {
+// Custom game state, an ArraySchema of type Player only at the moment
+
+exports.State = class State extends schema.Schema {
     constructor() {
         super();
-        this.players = new MapSchema();
+        this.players = new schema.MapSchema();
     }
 }
 
-defineTypes(State, {
-    players: { map: Player }
+// STATE SCHEMA
+// To tell Colyseus how to synchronize the state of individual players across clients
+schema.defineTypes(exports.State, {
+    players: { map: exports.Player }
 });
 
-// Exporting for use in GameRoom
-exports.Player = Player;
-exports.State = State;
-
-
-// GameRoom class definition
-exports.GameRoom = class GameRoom extends Room {
+exports.GameRoom = class GameRoom extends colyseus.Room {
+    // Colyseus will invoke when creating the room instance
     onCreate(options) {
         // initialize empty room state
-        this.setState(new State());
+        this.maxClients = 2;
+        this.setState(new exports.State()); // Reference the State class correctly
+
+
 
         // Called every time this room receives a "rollDice" message
-        this.onMessage('rollDice', (client) => {
+        this.onMessage("rollDice", (client) => {
             const diceValue = Math.floor(Math.random() * 6) + 1;
             const player = this.state.players.get(client.sessionId);
 
             if (player) {
-                // Update player's position
-                const moveDistance = diceValue * 0.05;
-                player.position += moveDistance;
-                if (player.position > 1) {
-                    player.position = 1;
-                    console.log(`Player ${client.sessionId} reached the end!`);
-                    // Send a message to the client that the player has reached the end
-                    this.broadcast('end', { id: client.sessionId });
-                }
+                const moveDistance = diceValue * 0.05; // Define how far to move
+                player.position += moveDistance; // Update the position
 
-                console.log(`Player ${client.sessionId} rolled ${diceValue} and moved to position ${player.position}`);
-                console.log(`Broadcasting update: { id: ${client.sessionId}, diceValue: ${diceValue}, position: ${player.position} }`);
-                // Broadcast movement to all clients
-                this.broadcast('update', { id: client.sessionId, diceValue, position: player.position });
+                // Clamp the position between 0 and 1
+                player.position = Math.max(0, Math.min(1, player.position));
+
+                // Broadcast updated position
+                this.broadcast("diceRolled", {
+                    sessionId: client.sessionId,
+                    diceValue: diceValue,
+                    position: player.position
+                });
             }
         });
 
+
     }
 
-    onJoin(client) {
-        console.log(`Player ${client.sessionId} joined`);
+    // Called every time a client joins
+    onJoin(client, options) {
+        const player = new exports.Player();
+        console.log(`Player ${client.sessionId} is attempting to join with initial position: ${player.position}`);
 
-        // Add a new player to the state
-        const newPlayer = new Player();
-        this.state.players.set(client.sessionId, newPlayer);
-        console.log('State after adding player:', this.state.players);
-        /*
-                // Trigger state change manually !!!!!!!
-                this.state.players.triggerAll();
-        
-                */
 
-        // DEBUG
-        console.log(`Player added to state: ${client.sessionId}`, this.state.players.get(client.sessionId));
+        // Add player to the state first  . nb should be CORRECT SYNTAX!!! This is closeus schema, not javascript obect!
+        //this.state.players[client.sessionId] = player; //this works too
 
-        // Log current state of players
-        console.log('Current players in state:', this.state.players);
+        this.state.players.set(client.sessionId, player);
+
+        // Get the number of players after adding the new player
+        const numberOfPlayers = Array.from(this.state.players.values()).length;
+
+        // Assign a sprite type based on the current number of players
+        player.spriteType = (numberOfPlayers % 2 === 0) ? 'sprite2' : 'sprite1';
+
+        console.log(`Player ${client.sessionId} added to state with position: ${this.state.players[client.sessionId].position} new position: ${player.position}`);
     }
 
-    onLeave(client) {
-        console.log(`Player ${client.sessionId} left`);
-        this.state.players.delete(client.sessionId);
+    onLeave(client, consented) {
+        // Remove the player from the state when they leave
+        delete this.state.players[client.sessionId];
+        console.log(`Player ${client.sessionId} left.`);
     }
-};
 
+}
