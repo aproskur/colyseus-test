@@ -29,7 +29,7 @@ exports.State = class State extends schema.Schema {
     constructor() {
         super();
         this.players = new schema.MapSchema();
-        this.currentTurn = null;
+        //this.currentTurn = null;
     }
 }
 
@@ -37,24 +37,25 @@ exports.State = class State extends schema.Schema {
 // To tell Colyseus how to synchronize the state of individual players across clients
 schema.defineTypes(exports.State, {
     players: { map: exports.Player },
-    currentTurn: "string"
+    //currentTurn: "string"
 });
 
 exports.GameRoom = class GameRoom extends colyseus.Room {
     // Colyseus will invoke when creating the room instance
     onCreate(options) {
         // initialize empty room state
-        this.maxClients = 2;
+        //this.maxClients = 2;
         this.setState(new exports.State()); // Reference the State class correctly
 
 
 
         // Called every time this room receives a "rollDice" message
         this.onMessage("rollDice", (client) => {
+            /*
             if (this.state.currentTurn !== client.sessionId) {
                 console.log(`Player ${client.sessionId} attempted to roll the dice out of turn.`);
                 return; // Ignore dice roll if it's not this player's turn
-            }
+            } */
             const diceValue = Math.floor(Math.random() * 6) + 1;
             const player = this.state.players.get(client.sessionId);
 
@@ -73,36 +74,38 @@ exports.GameRoom = class GameRoom extends colyseus.Room {
                 });
 
                 // After the move, pass the turn to the next player
-                this.passTurnToNextPlayer();
+                //this.passTurnToNextPlayer();
             }
         });
 
 
     }
-
-    passTurnToNextPlayer() {
-        const players = Array.from(this.state.players.keys());
-        const currentTurnIndex = players.indexOf(this.state.currentTurn);
-
-        // Move to the next player in the list
-        const nextTurnIndex = (currentTurnIndex + 1) % players.length;
-        this.state.currentTurn = players[nextTurnIndex];
-
-        // Notify all clients about the turn change
-        this.broadcast("newTurn", { sessionId: this.state.currentTurn });
-    }
+    /*
+        passTurnToNextPlayer() {
+            const players = Array.from(this.state.players.keys());
+            const currentTurnIndex = players.indexOf(this.state.currentTurn);
+    
+            // Move to the next player in the list
+            const nextTurnIndex = (currentTurnIndex + 1) % players.length;
+            this.state.currentTurn = players[nextTurnIndex];
+    
+            // Notify all clients about the turn change
+            this.broadcast("newTurn", { sessionId: this.state.currentTurn });
+        } */
 
 
     // Called every time a client joins
     onJoin(client, options) {
         const player = new exports.Player();
         console.log(`Player ${client.sessionId} is attempting to join with initial position: ${player.position}`);
+
+        /*
         // If this is the first player, assign the turn 
         if (this.state.currentTurn === null) {
             this.state.currentTurn = client.sessionId;
         }
 
-        console.log(`Player ${client.sessionId} joined. Current turn: ${this.state.currentTurn}`);
+        console.log(`Player ${client.sessionId} joined. Current turn: ${this.state.currentTurn}`); */
 
         // Add player to the state first  . nb should be CORRECT SYNTAX!!! This is closeus schema, not javascript obect!
         // this.state.players[client.sessionId] = player; //this works too
