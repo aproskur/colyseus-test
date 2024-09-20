@@ -116,9 +116,21 @@ exports.GameRoom = class GameRoom extends colyseus.Room {
         const numberOfPlayers = Array.from(this.state.players.values()).length;
 
         // Assign a sprite type based on the current number of players
-        player.spriteType = (numberOfPlayers % 2 === 0) ? 'sprite2' : 'sprite1';
+        if (numberOfPlayers === 1) {
+            player.spriteType = 'sprite1'; // First player
+        } else if (numberOfPlayers === 2) {
+            player.spriteType = 'sprite2'; // Second player
+        } else if (numberOfPlayers === 3) {
+            player.spriteType = 'sprite3'; // Third player (booImage)
+        } else if (numberOfPlayers === 4) {
+            player.spriteType = 'sprite4'; //carrot
+        } else {
+            // If more than 3 players, you could alternate or loop between sprites
+            const spriteTypes = ['sprite1', 'sprite2', 'sprite3', 'sprite4'];
+            player.spriteType = spriteTypes[(numberOfPlayers - 1) % 4]; // Cycle between sprite1, sprite2, and sprite3
+        }
 
-        console.log(`Player ${client.sessionId} added to state with position: ${this.state.players[client.sessionId].position} new position: ${player.position}`);
+        console.log(`Player ${client.sessionId} added to state with sprite: ${player.spriteType}`);
     }
 
     onLeave(client, consented) {
